@@ -1,0 +1,8 @@
+Create files app.js contants.js index.js
+
+-r dotenv/config --experimental-json-modules ./src/index.js
+
+create folders controllers ,db , middlewares ,routes , models, utils 
+
+packgaes: mongoose, express, dotenv
+dev-pack: prettier nodemon
