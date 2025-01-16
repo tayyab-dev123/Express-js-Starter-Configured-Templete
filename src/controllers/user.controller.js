@@ -4,6 +4,7 @@ import apiError from '../utils/apiError.js';
 import { User } from '../models/user.model.js';
 import apiResponse from '../utils/apiResponse.js';
 import uploadOnCloudinary from '../utils/cloudinary.js';
+import jwt from 'jsonwebtoken';
 
 const generateAccessTokenAndRefreshToken = async (userId) => {
   try {
@@ -109,7 +110,7 @@ const loginRegister = asyncHandler(async (req, res) => {
   //     throw new apiError(400, 'All fields are required');
   //   }
 
-  if (!username || !email) {
+  if (!(username || email)) {
     throw new apiError(400, 'Username or email is required');
   }
 
@@ -181,4 +182,164 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new apiResponse(200, {}, 'Logout successful'));
 });
 
-export { registerUser, loginRegister, logoutUser };
+const changeUserPassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  if (!oldPassword || !newPassword) {
+    throw new apiError(400, 'All fields are required');
+  }
+  if (oldPassword === newPassword) {
+    throw new apiError(
+      400,
+      'New password should be different from old password'
+    );
+  }
+  const user = await User.findById(req.user._id);
+  if (!user) {
+    throw new apiError(400, 'User not found');
+  }
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+  if (!isPasswordCorrect) {
+    throw new apiError(400, 'Invalid password');
+  }
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+  return res
+    .status(200)
+    .json(new apiResponse(200, {}, 'Password updated successfully'));
+});
+
+const getCurrentUser = asyncHandler(async (req, res) => {
+  return res.status(200).json(new apiResponse(200, req.user, 'User found'));
+});
+
+const updateAccountDetails = asyncHandler(async (req, res) => {
+  const { fullName, username, email } = req.body;
+  if (!fullName || !username || !email) {
+    throw new apiError(400, 'All fields are required');
+  }
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        fullName,
+        username,
+        email,
+      },
+    },
+    { new: true }
+  ).select('-password -refreshToken');
+  if (!updatedUser) {
+    throw new apiError(500, 'Error updating user details');
+  }
+  return res
+    .status(200)
+    .json(
+      new apiResponse(200, updatedUser, 'User details updated successfully')
+    );
+});
+
+const updateAvatar = asyncHandler(async (req, res) => {
+  const avatarLocalPath = req.file?.path;
+  if (!avatarLocalPath) {
+    throw new apiError(400, 'Unable to get avatar file path');
+  }
+  const avatar = await uploadOnCloudinary(avatarLocalPath);
+  if (!avatar?.url) {
+    throw new apiError(500, 'Error uploading avatar');
+  }
+  const updatedAvatar = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        avatar: avatar.url,
+      },
+    },
+    { new: true }
+  );
+  if (!updatedAvatar) {
+    throw new apiError(500, 'Error updating avatar');
+  }
+
+  // Delete old avatar from cloudinary
+
+  return res
+    .status(200)
+    .json(new apiResponse(200, updatedAvatar, 'Avatar updated successfully'));
+});
+const updateCoverImage = asyncHandler(async (req, res) => {
+  const coverImageLocalPath = req.file?.path;
+  if (!coverImageLocalPath) {
+    throw new apiError(400, 'Unable to get cober image file path');
+  }
+  const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+  if (!coverImage?.url) {
+    throw new apiError(500, 'Error uploading cover image');
+  }
+  const updatedCoverImage = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $set: {
+        coverImage: coverImage.url,
+      },
+    },
+    { new: true }
+  );
+  if (!updatedCoverImage) {
+    throw new apiError(500, 'Error updating avatar');
+  }
+  return res
+    .status(200)
+    .json(
+      new apiResponse(
+        200,
+        updatedCoverImage,
+        'Cover image updated successfully'
+      )
+    );
+});
+
+const refreshAccessToken = asyncHandler(async (req, res) => {
+  const { refreshToken } = req.cookies || req.headers;
+  if (!refreshToken) {
+    throw new apiError(400, 'Refresh token not found');
+  }
+  const decodedToken = jwt.verify(
+    refreshToken,
+    process.env.REFRESH_TOKEN_SECRET
+  );
+  if (!decodedToken) {
+    throw new apiError(400, 'Invalid refresh token');
+  }
+  const user = await User.findById(decodedToken._id);
+  if (!user) {
+    throw new apiError(400, 'User not found');
+  }
+  const { accessToken, refreshToken: newRefreshToken } =
+    await generateAccessTokenAndRefreshToken(user._id);
+
+  if (!accessToken || !newRefreshToken) {
+    throw new apiError(500, 'Error generating access token and refresh token');
+  }
+  return res.status(200).json(
+    new apiResponse(
+      200,
+      {
+        accessToken,
+        refreshToken: newRefreshToken,
+      },
+      'Access token refreshed successfully'
+    )
+  );
+});
+
+export {
+  registerUser,
+  loginRegister,
+  logoutUser,
+  refreshAccessToken,
+  changeUserPassword,
+  getCurrentUser,
+  updateAccountDetails,
+  updateAvatar,
+  updateCoverImage,
+};

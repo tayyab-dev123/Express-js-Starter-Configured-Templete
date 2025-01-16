@@ -2,18 +2,22 @@ import asyncHandler from 'express-async-handler';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/user.model.js';
 import ApiError from '../utils/apiError.js';
+import dotenv from 'dotenv';
+
+// Ensure environment variables are loaded
+dotenv.config();
 
 const jwtVerify = asyncHandler(async (req, res, next) => {
   try {
     //get a token from req.cookies or req.headers
     const token =
       req.cookies?.accessToken ||
-      req.headers('Authorization')?.replace('Bearer ', '');
+      req.headers['authorization']?.replace('Bearer ', '');
     if (!token) {
       throw new ApiError(401, 'TOken not found for jwtVerify');
     }
     // verify token
-    const decodedToken = jwt.verify(token, process.env.JWT_SECRET);
+    const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     // get user details
     const user = await User.findById(decodedToken._id);
     if (!user) {
