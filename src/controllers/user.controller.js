@@ -3,8 +3,9 @@ import asyncHandler from 'express-async-handler';
 import apiError from '../utils/apiError.js';
 import { User } from '../models/user.model.js';
 import apiResponse from '../utils/apiResponse.js';
-import uploadOnCloudinary from '../utils/cloudinary.js';
 import jwt from 'jsonwebtoken';
+import uploadOnCloudinary from '../utils/cloudinary.js';
+import mongoose from 'mongoose';
 
 const generateAccessTokenAndRefreshToken = async (userId) => {
   try {
@@ -332,6 +333,137 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
   );
 });
 
+const getUserChennelProfile = asyncHandler(async (req, res) => {
+  //  Match the user by username.
+  // Use $lookup to fetch:
+  // Users subscribed to this channel (subscribers).
+  // Channels the user has subscribed to.
+  // Add calculated fields:
+  // Count of subscribers and subscriptions.
+  // Whether the authenticated user is subscribed to this channel.
+  // Select only the relevant fields for the response.
+
+  const { username } = req.params;
+
+  if (!username) {
+    throw new apiError(400, 'Username is required');
+  }
+
+  const chennel = await User.aggregate([
+    // Match the user by username.
+    {
+      $match: {
+        username: username?.toLowerCase(),
+      },
+    },
+    // Use $lookup to fetch:
+    {
+      $lookup: {
+        from: 'subscribes',
+        localField: '_id',
+        foreignField: 'channel',
+        as: 'subscribers',
+      },
+    },
+    {
+      $lookup: {
+        from: 'subscribes',
+        localField: 'subscribe',
+        foreignField: '_id',
+        as: 'subscribedTo',
+      },
+    },
+    // Add calculated fields:
+    {
+      $addFields: {
+        subscriberCount: { $size: '$subscribers' },
+        subscriptionCount: { $size: '$subscribedTo' },
+        isSubscribed: {
+          $cond: {
+            if: {
+              $in: [req.user._id, '$subscribers.subscribe'],
+            },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    // Select only the relevant fields for the response.
+    {
+      $project: {
+        fullName: 1,
+        username: 1,
+        avatar: 1,
+        coverImage: 1,
+        subscriberCount: 1,
+        subscriptionCount: 1,
+        isSubscribed: 1,
+      },
+    },
+  ]);
+
+  if (!chennel.length > 0) {
+    throw new apiError(404, 'Channel not found');
+  }
+
+  res.status(200).json(new apiResponse(200, chennel[0], 'Channel found'));
+});
+
+const getWatchHistory = asyncHandler(async (req, res) => {
+  const user = new mongoose.Types.ObjectId(req.user._id);
+
+  const watchHisory = await User.aggregate([
+    {
+      $match: {
+        _id: user,
+      },
+    },
+    {
+      $lookup: {
+        from: 'videos',
+        localField: 'watchHistory',
+        foreignField: '_id',
+        as: 'watchHistory',
+        pipeline: [
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'owner',
+              foreignField: '_id',
+              as: 'owner',
+              pipeline: [
+                {
+                  $project: {
+                    fullName: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+    {
+      $project: {
+        watchHistory: 1,
+      },
+    },
+  ]);
+
+  if (!watchHisory.length > 0) {
+    throw new apiError(404, 'Watch history not found');
+  }
+
+  res
+    .status(200)
+    .json(
+      new apiResponse(200, watchHisory[0], 'Watch history fetched successfully')
+    );
+});
+
 export {
   registerUser,
   loginRegister,
@@ -342,4 +474,6 @@ export {
   updateAccountDetails,
   updateAvatar,
   updateCoverImage,
+  getUserChennelProfile,
+  getWatchHistory,
 };

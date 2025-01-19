@@ -58,28 +58,28 @@ const uploadOnCloudinary = async (localFilePath) => {
   }
 };
 
-const deleteFromCloudinary = async (publicId) => {
-  try {
-    if (!publicId) return null;
+// const deleteFromCloudinary = async (publicId) => {
+//   try {
+//     if (!publicId) return null;
 
-    console.log('Attempting to delete file:', publicId);
-    console.log('Using Cloudinary config:', {
-      cloud_name: cloudinaryConfig.cloud_name,
-      api_key: cloudinaryConfig.api_key?.substring(0, 5) + '...',
-    });
+//     console.log('Attempting to delete file:', publicId);
+//     console.log('Using Cloudinary config:', {
+//       cloud_name: cloudinaryConfig.cloud_name,
+//       api_key: cloudinaryConfig.api_key?.substring(0, 5) + '...',
+//     });
 
-    const response = await cloudinary.uploader.destroy(publicId);
+//     const response = await cloudinary.uploader.destroy(publicId);
 
-    console.log('File deleted successfully:', response.result);
-    return response;
-  } catch (error) {
-    console.error('Detailed delete error:', {
-      message: error.message,
-      code: error.code,
-      http_code: error.http_code,
-    });
-    return null;
-  }
-};
+//     console.log('File deleted successfully:', response.result);
+//     return response;
+//   } catch (error) {
+//     console.error('Detailed delete error:', {
+//       message: error.message,
+//       code: error.code,
+//       http_code: error.http_code,
+//     });
+//     return null;
+//   }
+// };
 
-export default { uploadOnCloudinary, deleteFromCloudinary };
+export default uploadOnCloudinary;
