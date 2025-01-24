@@ -18,8 +18,10 @@ app.use(cookieParser());
 // Routes
 import userRoutes from './routes/user.routes.js';
 import errorHandler from './middlewares/errorHandler.middleware.js';
+import commentRoutes from './routes/comment.routes.js';
 
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/comments', commentRoutes);
 // Error handling middleware
 // app.use(errorHandler);
 
